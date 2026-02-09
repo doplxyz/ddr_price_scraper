@@ -5,6 +5,10 @@ ddr_price_scraper.py
 ====================
 Amazon.co.jp の DDR4/DDR5 メモリ価格スクレイピング＋グラフ生成を一貫実行するツール。
 
+[Version 2.3]
+  - 価格フィルタ(OUTLIER_LO/HI)とスリープ時間(SLEEP_SEC)をコンフィグ変数化
+  - 内部バージョンを更新
+
 [Version 2.2]
   - 引数をユーザで管理出来るよう見える化
   
@@ -194,11 +198,22 @@ Y_LABEL_FONTSIZE = 12          # Y軸ラベルのフォントサイズ,default,1
 # END OF LAYOUT CONFIGURATION SECTION
 # ============================================================
 
+# ============================================================
+# SCRAPE & FILTER CONFIGURATION SECTION
+# ============================================================
+# このセクションの数値を変更することで、スクレイピングや集計の挙動を調整できます
+
+# --- Price Filter Settings ---
+PRICE_OUTLIER_LO = 0.30        # 下限値の切り捨てライン(中央値の何倍か),default,0.30
+PRICE_OUTLIER_HI = 0.95        # 上限値の切り捨てライン(中央値の何倍か),default,0.95
+
+# --- Scrape Timer Settings ---
+SCRAPE_SLEEP_SEC = 10.0        # 各ターゲット間の待機秒(デフォルト),default,10.0
 
 # ============================================================
 # Global Settings
 # ============================================================
-VERSION = "2.2"
+VERSION = "2.3"
 
 TARGETS = {
     "DDR4": ["4GB", "8GB",  "16GB", "32GB", "64GB", "128GB"],
@@ -760,7 +775,7 @@ def main():
     ap.add_argument("--kind", choices=["DDR4", "DDR5"], help="Target DDR Kind (e.g. DDR4)")
     ap.add_argument("--capacity", help="Target capacity (e.g. 32GB)")
 
-    ap.add_argument("--sleep", type=float, default=10.0, help="Wait time (sec)")
+    ap.add_argument("--sleep", type=float, default=SCRAPE_SLEEP_SEC, help="Wait time (sec)")
     ap.add_argument("--jitter", type=float, default=2.0, help="Jitter time (sec)")
     ap.add_argument("--timeout", type=int, default=30, help="HTTP timeout (sec)")
     ap.add_argument("--retries", type=int, default=3, help="Retry count")
@@ -816,7 +831,7 @@ def main():
         
     print(f"=== Generating Graph [{args.date}] ===")
     
-    rows = load_stats_from_dir(target_dir, 0.3, 2.5)
+    rows = load_stats_from_dir(target_dir, PRICE_OUTLIER_LO, PRICE_OUTLIER_HI)
     
     if not rows:
         print("[Error] No valid CSVs found in directory.")
@@ -826,7 +841,7 @@ def main():
         current_dt = _dt.datetime.strptime(args.date, "%Y-%m-%d").date()
         prev_date = (current_dt - _dt.timedelta(days=1)).strftime("%Y-%m-%d")
         prev_dir = base_dir / f"ddr_scrape_{prev_date}"
-        prev_rows = load_stats_from_dir(prev_dir, 0.3, 2.5) if prev_dir.exists() else []
+        prev_rows = load_stats_from_dir(prev_dir, PRICE_OUTLIER_LO, PRICE_OUTLIER_HI) if prev_dir.exists() else []
     except ValueError:
         prev_rows = []
     
