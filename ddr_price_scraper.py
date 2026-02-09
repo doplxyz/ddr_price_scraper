@@ -76,8 +76,8 @@ Amazon.co.jp の DDR4/DDR5 メモリ価格スクレイピング＋グラフ生�
   $ python3 ddr_price_scraper.py gauge --show
 
   --- 高度なオプション ---
-  # ページ遷移のスリープを 10秒に延長（デフォルト: 7.0秒）
-  $ python3 ddr_price_scraper.py --scrape --sleep 10.0
+  # ページ遷移のスリープを 15秒に延長（デフォルト: 10.0秒）
+  $ python3 ddr_price_scraper.py --scrape --sleep 15.0
 
 ============================================================
 [オプション一覧（このスクリプトで実際に使えるもの）]
@@ -141,7 +141,7 @@ PRICE_FILTER_LOWER_RATIO = 0.3
 PRICE_FILTER_UPPER_RATIO = 0.95
 
 # Sleep settings (seconds)
-DEFAULT_SLEEP_SEC = 7.0
+DEFAULT_SLEEP_SEC = 10.0
 DEFAULT_JITTER_SEC = 2.0
 
 
