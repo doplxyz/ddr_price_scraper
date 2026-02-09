@@ -140,7 +140,7 @@ FIGURE_DPI = 90               # 解像度(DPI),default,100
 MARGIN_TOP = 0.90              # 上マージン(0.0-1.0),default,0.90
 MARGIN_BOTTOM = 0.05           # 下マージン(0.0-1.0),default,0.05
 MARGIN_RIGHT = 0.98            # 右マージン(0.0-1.0),default,0.98
-MARGIN_LEFT = 0.07             # 左マージン(0.0-1.0),default,0.10
+MARGIN_LEFT = 0.14             # 左マージン(0.0-1.0),default,0.10
 
 # --- Bar Chart Settings ---
 BAR_HEIGHT = 0.62              # バーの高さ,default,0.62
