@@ -120,7 +120,23 @@ from typing import List, Optional, Tuple, Dict
 # ============================================================
 # Global Settings
 # ============================================================
-VERSION = "2.1"
+VERSION = "2.2"
+
+# ============================================================
+# User Configuration
+# ============================================================
+# Price filtering settings (Cutoff thresholds relative to Median)
+# Lower limit: Median * RATIO. Prices below this are excluded (e.g. 0.3 = 30% of median).
+PRICE_FILTER_LOWER_RATIO = 0.3
+
+# Upper limit: Median * RATIO. Prices above this are excluded.
+# User note: "Supposed to be 95%" (0.95)
+PRICE_FILTER_UPPER_RATIO = 0.95
+
+# Sleep settings (seconds)
+DEFAULT_SLEEP_SEC = 7.0
+DEFAULT_JITTER_SEC = 2.0
+
 
 TARGETS = {
     "DDR4": ["4GB", "8GB",  "16GB", "32GB", "64GB", "128GB"],
@@ -531,8 +547,8 @@ def main():
     ap.add_argument("--kind", choices=["DDR4", "DDR5"], help="Target DDR Kind (e.g. DDR4)")
     ap.add_argument("--capacity", help="Target capacity (e.g. 32GB)")
 
-    ap.add_argument("--sleep", type=float, default=7.0, help="Wait time (sec)")
-    ap.add_argument("--jitter", type=float, default=2.0, help="Jitter time (sec)")
+    ap.add_argument("--sleep", type=float, default=DEFAULT_SLEEP_SEC, help="Wait time (sec)")
+    ap.add_argument("--jitter", type=float, default=DEFAULT_JITTER_SEC, help="Jitter time (sec)")
     ap.add_argument("--timeout", type=int, default=30, help="HTTP timeout (sec)")
     ap.add_argument("--retries", type=int, default=3, help="Retry count")
     
@@ -589,7 +605,7 @@ def main():
         
     print(f"=== Generating Graph [{args.date}] ===")
     
-    rows = load_stats_from_dir(target_dir, 0.3, 2.5)
+    rows = load_stats_from_dir(target_dir, PRICE_FILTER_LOWER_RATIO, PRICE_FILTER_UPPER_RATIO)
     
     if not rows:
         print("[Error] No valid CSVs found in directory.")
@@ -599,7 +615,7 @@ def main():
         current_dt = _dt.datetime.strptime(args.date, "%Y-%m-%d").date()
         prev_date = (current_dt - _dt.timedelta(days=1)).strftime("%Y-%m-%d")
         prev_dir = base_dir / f"ddr_scrape_{prev_date}"
-        prev_rows = load_stats_from_dir(prev_dir, 0.3, 2.5) if prev_dir.exists() else []
+        prev_rows = load_stats_from_dir(prev_dir, PRICE_FILTER_LOWER_RATIO, PRICE_FILTER_UPPER_RATIO) if prev_dir.exists() else []
     except ValueError:
         prev_rows = []
     
