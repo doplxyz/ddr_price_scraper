@@ -15,7 +15,7 @@ Amazon.co.jp の DDR4/DDR5 メモリ価格スクレイピング＋グラフ生�
 
 [Version 2.2]
   - 引数をユーザで管理出来るよう見える化
-  
+
 [Version 2.1]
   - コマンド体系を刷新 (gauge サブコマンド導入)
   - 引数なし実行時にヘルプを表示
@@ -316,7 +316,7 @@ def fetch_html(url: str, timeout_sec: int, retries: int = 3) -> str:
     headers = dict(COMMON_HEADERS)
     headers["Referer"] = AMAZON_BASE_URL + "/"
     req = urllib.request.Request(url, headers=headers, method="GET")
-    
+
     waits = [2, 5, 10, 20]
     for i in range(retries + 1):
         if i > 0:
@@ -421,59 +421,59 @@ def split_items(html: str) -> List[str]:
     """
     matches = list(ASIN_RE.finditer(html))
     chunks = []
-    
+
     if not matches:
         return chunks
-    
+
     for idx, m in enumerate(matches):
         start = m.start()
         if (idx + 1) < len(matches):
             end = matches[idx + 1].start()
         else:
             end = min(len(html), start + 10000)
-        
+
         chunk = html[start:end]
         chunks.append(chunk)
-    
+
     return chunks
 
 def parse_product_chunk(chunk: str, target_kind: str, target_cap_gb: int) -> Optional[Tuple[int, str]]:
     # BAD_SELLER判定（旧スクリプトと同様にチャンク単位でチェック）
     if BAD_SELLER_RE.search(chunk):
         return None
-    
+
     title = extract_title(chunk)
     if not title: return None
-    
+
     detected_kind = guess_ddr_kind(title)
     if detected_kind != target_kind: return None
-    
+
     if not looks_like_memory(title): return None
-    
+
     cap = extract_capacity_gb(title)
     if cap != target_cap_gb: return None
-    
+
     price = extract_price_from_whole_snippet(chunk)
     if price is None: return None
-    
+
     return (price, title)
 
-def run_scrape_one(kind: str, cap_str: str, out_dir: Path, 
-                   sleep_sec: float, jitter_sec: float, 
+def run_scrape_one(kind: str, cap_str: str, out_dir: Path,
+                   sleep_sec: float, jitter_sec: float,
                    timeout_sec: int, retries: int):
     cap_val = int(cap_str.replace("GB", ""))
     label = f"amazon_{kind.lower()}_{cap_str.lower()}"
     out_csv = out_dir / f"{label}.csv"
-    
+
     log_progress(f"Scraping: {kind} {cap_str}")
     url = build_search_url(kind, cap_str)
-    
+
     try:
         html = fetch_html(url, timeout_sec, retries)
     except RuntimeError as e:
         log_progress(f"[FAIL] {label} -> {e}")
         return
-    
+
     # デバッグ用: HTMLを保存
     debug_html = out_dir / f"{label}_debug.html"
     try:
@@ -481,75 +481,75 @@ def run_scrape_one(kind: str, cap_str: str, out_dir: Path,
             f.write(html)
     except:
         pass
-    
+
     if is_captcha_blocked(html):
         log_progress(f"[WARN] {label} -> CAPTCHA detected! Abort.")
         return
-    
+
     # Bad seller page判定を削除（商品が見つからない場合は後で判定）
-    
+
     chunks = split_items(html)
     log_progress(f"Found {len(chunks)} candidate chunks")
-    
+
     results = []
     skipped_reasons = {"bad_seller": 0, "no_title": 0, "wrong_kind": 0, "not_memory": 0, "wrong_capacity": 0, "no_price": 0}
-    
+
     for chunk in chunks:
         # BAD_SELLER判定
         if BAD_SELLER_RE.search(chunk):
             skipped_reasons["bad_seller"] += 1
             continue
-        
+
         # タイトル取得
         title = extract_title(chunk)
         if not title:
             skipped_reasons["no_title"] += 1
             continue
-        
+
         # 規格判定
         detected_kind = guess_ddr_kind(title)
         if detected_kind != kind:
             skipped_reasons["wrong_kind"] += 1
             continue
-        
+
         # メモリかどうかの判定
         if not looks_like_memory(title):
             skipped_reasons["not_memory"] += 1
             continue
-        
+
         # 容量判定
         cap = extract_capacity_gb(title)
         if cap != cap_val:
             skipped_reasons["wrong_capacity"] += 1
             continue
-        
+
         # 価格取得
         price = extract_price_from_whole_snippet(chunk)
         if price is None:
             skipped_reasons["no_price"] += 1
             continue
-        
+
         results.append((price, title))
-    
+
     # スキップ理由のサマリを表示
     log_progress(f"Skipped: bad_seller={skipped_reasons['bad_seller']}, no_title={skipped_reasons['no_title']}, "
                  f"wrong_kind={skipped_reasons['wrong_kind']}, not_memory={skipped_reasons['not_memory']}, "
                  f"wrong_capacity={skipped_reasons['wrong_capacity']}, no_price={skipped_reasons['no_price']}")
-    
+
     if not results:
         log_progress(f"[WARN] {label} -> No valid items found. Check {label}_debug.html")
         return
-    
+
     if not results:
         log_progress(f"[WARN] {label} -> No valid items found.")
         return
-    
+
     with open(out_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["Price", "Title"])
         for (price, title) in results:
             writer.writerow([price, title])
-    
+
     log_progress(f"[OK] {label} -> {len(results)} items saved to {out_csv.name}")
 
 # ============================================================
@@ -557,18 +557,18 @@ def run_scrape_one(kind: str, cap_str: str, out_dir: Path,
 # ============================================================
 def load_stats_from_dir(data_dir: Path, outlier_lo: float = 0.3, outlier_hi: float = 2.5) -> List[StatRow]:
     if not data_dir.exists(): return []
-    
+
     rows = []
     for csv_path in sorted(data_dir.glob("*.csv")):
         stem = csv_path.stem
         parts = stem.split("_")
-        
+
         # ファイル名形式の判定と解析
         # パターン1: amazon_ddr4_8gb.csv (3要素以上)
         # パターン2: DDR4_8GB.csv (2要素)
         kind = None
         cap_str = None
-        
+
         if len(parts) >= 3:
             # amazon_ddr4_8gb形式を想定
             kind = parts[1].upper()
@@ -579,17 +579,17 @@ def load_stats_from_dir(data_dir: Path, outlier_lo: float = 0.3, outlier_hi: flo
             cap_str = parts[1]
         else:
             continue  # 要素が足りない場合はスキップ
-        
+
         # 規格チェック: DDR4またはDDR5でなければスキップ
         if kind not in ["DDR4", "DDR5"]: continue
-        
+
         # 容量文字列から数値を抽出
         cap_val_str = cap_str.replace("GB", "").replace("gb", "").strip()
         try:
             cap_val = int(cap_val_str)
         except ValueError:
             continue  # 数値に変換できない場合はスキップ
-        
+
         prices = []
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -599,16 +599,16 @@ def load_stats_from_dir(data_dir: Path, outlier_lo: float = 0.3, outlier_hi: flo
                     prices.append(p)
                 except (ValueError, KeyError):
                     pass
-        
+
         if not prices: continue
-        
+
         med = calc_median(prices)
         lo_thr = int(med * outlier_lo)
         hi_thr = int(med * outlier_hi)
         valid = [p for p in prices if lo_thr <= p <= hi_thr]
-        
+
         if not valid: valid = prices
-            
+
         rows.append(StatRow(
             kind=kind,
             capacity=cap_val,
@@ -627,7 +627,7 @@ def load_stats_from_dir(data_dir: Path, outlier_lo: float = 0.3, outlier_hi: flo
 def plot_price_gauge(rows: List[StatRow], out_path: Path, date_str: str, prev_rows: List[StatRow] = None, show: bool = False):
     """
     グラフ生成関数
-    
+
     レイアウト設定は、スクリプト冒頭の「LAYOUT CONFIGURATION SECTION」で
     定義された変数を使用します。
     """
@@ -639,7 +639,7 @@ def plot_price_gauge(rows: List[StatRow], out_path: Path, date_str: str, prev_ro
 
     # [LABEL] Previous Data Mapping
     prev_map = {r.label: r for r in (prev_rows or [])}
-    
+
     # [LABEL] Data Extraction
     labels = [r.label for r in rows]
     mins = [r.min_price for r in rows]
@@ -647,84 +647,84 @@ def plot_price_gauge(rows: List[StatRow], out_path: Path, date_str: str, prev_ro
     maxs = [r.max_price for r in rows]
 
     global_max = max(maxs) if maxs else 10000
-    
+
     # [LABEL] X-Axis Limit Calculation
     # 最大バーがグラフ幅の指定位置に来るように調整
     xlim_right = global_max / X_AXIS_MAX_BAR_POSITION
-    
+
     # [LABEL] Text Start Position Calculation
     col_start_x = global_max * TEXT_START_MULTIPLIER
     if col_start_x < xlim_right * TEXT_START_MIN_RATIO:
         col_start_x = xlim_right * TEXT_START_MIN_RATIO
-        
+
     # [LABEL] Column Layout Calculation
     text_width = xlim_right - col_start_x
-    
+
     w_min = COLUMN_WIDTH_MIN
     w_avg = COLUMN_WIDTH_AVG
     w_max = COLUMN_WIDTH_MAX
     w_cnt = COLUMN_WIDTH_CNT
     total_w = w_min + w_avg + w_max + w_cnt
     w_unit = text_width / total_w
-    
+
     # 各列の右端位置を計算(ha='right'のため)
     x_min_txt = col_start_x + w_unit * w_min
     x_avg_txt = x_min_txt + w_unit * w_avg
     x_max_txt = x_avg_txt + w_unit * w_max
     x_cnt_txt = x_max_txt + w_unit * w_cnt
-    
+
     # [LABEL] Figure Size Calculation
     fig_h = max(FIGURE_HEIGHT_BASE, FIGURE_HEIGHT_PER_ROW * len(rows) + FIGURE_HEIGHT_OFFSET)
     fig, ax = plt.subplots(figsize=(FIGURE_WIDTH, fig_h), dpi=FIGURE_DPI)
-    
+
     # [LABEL] Figure Margins
     plt.subplots_adjust(
-        top=MARGIN_TOP, 
-        bottom=MARGIN_BOTTOM, 
-        right=MARGIN_RIGHT, 
+        top=MARGIN_TOP,
+        bottom=MARGIN_BOTTOM,
+        right=MARGIN_RIGHT,
         left=MARGIN_LEFT
     )
 
     # [LABEL] Y-Axis Positions
     y_pos = list(range(len(rows)))
-    
+
     # [LABEL] Bar Drawing
     ax.barh(y_pos, maxs, color=COLOR_MAX, alpha=ALPHA_MAX, height=BAR_HEIGHT, label="MAX")
     ax.barh(y_pos, avgs, color=COLOR_AVG, alpha=ALPHA_AVG, height=BAR_HEIGHT*BAR_AVG_RATIO, label="AVG")
     ax.barh(y_pos, mins, color=COLOR_MIN, alpha=ALPHA_MIN, height=BAR_HEIGHT*BAR_MIN_RATIO, label="MIN")
-    
+
     # [LABEL] Y-Axis Labels
     ax.set_yticks(y_pos)
     ax.set_yticklabels(labels, fontsize=Y_LABEL_FONTSIZE, fontweight='bold')
     ax.invert_yaxis()
-    
+
     # [LABEL] X-Axis Settings
     ax.set_xlim(0, xlim_right)
     ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f"{int(x):,}"))
     ax.grid(axis='x', linestyle=':', alpha=0.5)
-    
+
     # [LABEL] Spine Visibility
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
     ax.spines['left'].set_visible(False)
-    
+
     # [LABEL] Title
     ax.set_title(
-        f"DDR4 & DDR5 Price Gauge {date_str} (JPY)", 
-        fontsize=TITLE_FONTSIZE, 
-        fontweight='bold', 
+        f"DDR4 & DDR5 Price Gauge {date_str} (JPY)",
+        fontsize=TITLE_FONTSIZE,
+        fontweight='bold',
         pad=TITLE_PAD
     )
-    
+
     # [LABEL] Legend
     handles, legend_labels = ax.get_legend_handles_labels()
     ax.legend(
-        handles[::-1], 
-        legend_labels[::-1], 
-        loc=LEGEND_LOCATION, 
-        bbox_to_anchor=(LEGEND_BBOX_X, LEGEND_BBOX_Y), 
-        ncol=LEGEND_NCOL, 
-        frameon=False, 
+        handles[::-1],
+        legend_labels[::-1],
+        loc=LEGEND_LOCATION,
+        bbox_to_anchor=(LEGEND_BBOX_X, LEGEND_BBOX_Y),
+        ncol=LEGEND_NCOL,
+        frameon=False,
         fontsize=LEGEND_FONTSIZE
     )
 
@@ -734,7 +734,7 @@ def plot_price_gauge(rows: List[StatRow], out_path: Path, date_str: str, prev_ro
     ax.text(x_avg_txt, head_y, "AVG", color='green', fontweight='bold', ha='right')
     ax.text(x_max_txt, head_y, "MAX", color='red', fontweight='bold', ha='right')
     ax.text(x_cnt_txt, head_y, "Count", color='black', fontweight='bold', ha='right')
-    
+
     # [LABEL] Price Difference Formatting Function
     def fmt_diff(curr, prev):
         txt = f"{curr:,}"
@@ -750,7 +750,7 @@ def plot_price_gauge(rows: List[StatRow], out_path: Path, date_str: str, prev_ro
         t_min = fmt_diff(r.min_price, pr.min_price if pr else None)
         t_avg = fmt_diff(r.avg_price, pr.avg_price if pr else None)
         t_max = fmt_diff(r.max_price, pr.max_price if pr else None)
-        
+
         ax.text(x_min_txt, i, t_min, va='center', ha='right', fontsize=DATA_TEXT_FONTSIZE, fontfamily='monospace')
         ax.text(x_avg_txt, i, t_avg, va='center', ha='right', fontsize=DATA_TEXT_FONTSIZE, fontfamily='monospace')
         ax.text(x_max_txt, i, t_max, va='center', ha='right', fontsize=DATA_TEXT_FONTSIZE, fontfamily='monospace')
@@ -772,14 +772,14 @@ def main():
         return 0
 
     ap = argparse.ArgumentParser(description="DDR Price Scraper Tool", add_help=False)
-    
+
     # サブコマンド用の引数 (nargs='?' で省略可能に)
     ap.add_argument("mode", nargs="?", choices=["gauge"], help="Subcommand: gauge to regen graph")
-    
+
     ap.add_argument("--scrape", action="store_true", help="Execute scraping")
     ap.add_argument("--date", default=_dt.date.today().strftime("%Y-%m-%d"), help="Target date YYYY-MM-DD")
     ap.add_argument("--base-dir", default=".", help="Base directory")
-    
+
     # 単体スクレイピング用の追加引数
     ap.add_argument("--kind", choices=["DDR4", "DDR5"], help="Target DDR Kind (e.g. DDR4)")
     ap.add_argument("--capacity", help="Target capacity (e.g. 32GB)")
@@ -788,25 +788,25 @@ def main():
     ap.add_argument("--jitter", type=float, default=2.0, help="Jitter time (sec)")
     ap.add_argument("--timeout", type=int, default=30, help="HTTP timeout (sec)")
     ap.add_argument("--retries", type=int, default=3, help="Retry count")
-    
+
     ap.add_argument("--show", action="store_true", help="Show GUI window")
     ap.add_argument("-h", "--help", action="help", help="show this help message and exit")
 
     args = ap.parse_args()
-    
+
     if not args.scrape and args.mode != 'gauge':
         print(__doc__)
         return 0
 
     base_dir = Path(args.base_dir).resolve()
     target_dir = base_dir / f"ddr_scrape_{args.date}"
-    
+
     # [LABEL] Scrape Phase
     if args.scrape:
         target_dir.mkdir(parents=True, exist_ok=True)
         print(f"=== Scraping Start [{args.date}] (v{VERSION}) ===")
         print(f"Config: Sleep={args.sleep}s (+0~{args.jitter}s), Retry={args.retries}")
-        
+
         # スクレイピング対象の決定
         scrape_targets = {}
         if args.kind and args.capacity:
@@ -824,11 +824,11 @@ def main():
 
         for kind, caps in scrape_targets.items():
             for cap in caps:
-                run_scrape_one(kind, cap, target_dir, 
+                run_scrape_one(kind, cap, target_dir,
                                args.sleep, args.jitter, args.timeout, args.retries)
                 sleep_with_jitter(args.sleep, args.jitter, "Next Target")
         print("\n=== Scraping Finished ===")
-    
+
     # [LABEL] Graph Phase
     if not target_dir.exists():
         if args.scrape:
@@ -837,15 +837,15 @@ def main():
             print(f"[Error] Directory not found: {target_dir}")
             print("Hint: Run with --scrape first.")
         return 1
-        
+
     print(f"=== Generating Graph [{args.date}] ===")
-    
+
     rows = load_stats_from_dir(target_dir, PRICE_OUTLIER_LO, PRICE_OUTLIER_HI)
-    
+
     if not rows:
         print("[Error] No valid CSVs found in directory.")
         return 1
-        
+
     try:
         current_dt = _dt.datetime.strptime(args.date, "%Y-%m-%d").date()
         prev_date = (current_dt - _dt.timedelta(days=1)).strftime("%Y-%m-%d")
@@ -853,10 +853,10 @@ def main():
         prev_rows = load_stats_from_dir(prev_dir, PRICE_OUTLIER_LO, PRICE_OUTLIER_HI) if prev_dir.exists() else []
     except ValueError:
         prev_rows = []
-    
+
     out_png = base_dir / f"ddr_price_{args.date}.png"
     plot_price_gauge(rows, out_png, args.date, prev_rows, args.show)
-    
+
     print(f"[Success] Graph saved to: {out_png}")
     print("-" * 65)
     print(f"{'Label':<15} | {'Min':>9} | {'Avg':>9} | {'Max':>9} | {'Cnt':>3}")
